@@ -1,0 +1,8 @@
+---
+- name: Set student password
+  become: true
+  user:
+    name: "student"
+    password: "{{ 'Rookworst31!' | password_hash('sha512') }}" 
+    update_password: always
+  ignore_errors: true

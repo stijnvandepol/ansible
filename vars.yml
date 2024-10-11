@@ -1,0 +1,5 @@
+vm_folder: "_Courses/I3-DB01/I530600"
+vcenter_datacenter: "Netlab-DC"
+vcenter_datastore: "DataCluster-Students"
+recourse_pool: "I530600"
+netlabcluster: "Netlab-Cluster-B"

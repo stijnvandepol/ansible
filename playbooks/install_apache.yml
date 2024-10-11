@@ -1,0 +1,24 @@
+# install_apache.yml
+- name: Update apt cache
+  apt:
+    update_cache: yes
+  become: yes  # Verhoogde rechten
+  become_user: student  # Dit kan weggelaten worden, want 'become' gebruikt standaard root
+  become_password: "student"
+
+- name: Install apache
+  apt:
+    name: apache2
+    state: present
+  become: yes  # Verhoogde rechten
+  become_user: student
+  become_password: "student"
+
+- name: Start apache at boot
+  systemd:
+    name: apache2
+    enabled: yes
+    state: started
+  become: yes  # Verhoogde rechten
+  become_user: student
+  become_password: "student"

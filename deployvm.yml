@@ -1,0 +1,54 @@
+# Fase 1: Deploy 2 virtuele machines in netlab
+- hosts: localhost
+  become: true
+  become_user: root
+  gather_facts: no
+  vars_files:
+    - vault.yml
+    - vars.yml
+
+  tasks:
+    - name: Deploy eerste VM (1)
+      include_role:
+        name: deployvm
+      vars:
+        vm_name: "testvm10"                          # VM name
+        vm_ip: "172.16.2.110"                       # VM IP
+        vm_template: "Templ_Ubuntu-Linux_Server"    # VM Template
+        vm_network: "2732_I530600_PVlanA"           # VM Vlan
+      tags: deployvm
+
+    - name: Deploy tweede VM (2)
+      include_role:
+        name: deployvm
+      vars:
+        vm_name: "testvm11"                          # VM name
+        vm_ip: "172.16.2.111"                       # VM IP
+        vm_template: "Templ_Ubuntu-Linux_Server"    # VM Template
+        vm_network: "2732_I530600_PVlanA"           # VM Vlan
+      tags: deployvm
+
+
+# Fase 2: Configureer en installeer software op de nieuwe VM
+- hosts: deployed_vms
+  become: true
+  become_user: root
+  vars:
+    ansible_ssh_pass: "student"
+    ansible_sudo_pass: "student"
+    ansible_become_pass: "student"
+  tasks:
+    - name: Update de nieuwe VM
+      include_role:
+        name: updateserver
+      tags: updateservers
+
+    - name: Installeer Apache op de nieuwe VM
+      include_role:
+        name: installapache
+      tags: installapache2
+
+    - name: Installeer CheckMK
+      include_role:
+        name: installcmkagent
+      tags: installcmkagent

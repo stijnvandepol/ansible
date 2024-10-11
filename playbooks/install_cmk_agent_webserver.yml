@@ -1,0 +1,117 @@
+---
+- name: Install checkmk agent en configureer Apache-monitoring
+  hosts: webservers
+  become: yes
+  vars_files:
+    - vault.yml
+  tasks:
+    - name: Download Checkmk-agent vanaf de CMK-server
+      ansible.builtin.get_url:
+        url: http://172.16.2.30/monitoring/check_mk/agents/check-mk-agent_2.3.0p15-1_all.deb
+        dest: /tmp/check-mk-agent.deb
+        url_username: "{{ cmk_username }}"
+        url_password: "{{ cmk_password }}"
+        force_basic_auth: yes
+
+    - name: Install agent
+      ansible.builtin.apt:
+        deb: /tmp/check-mk-agent.deb 
+        state: present
+        update_cache: yes  
+
+    - name: Verwijder bestand na installatie
+      ansible.builtin.file:
+        path: /tmp/check-mk-agent.deb  
+        state: absent
+
+    - name: Installeer Apache-status module (mod_status)
+      ansible.builtin.apt:
+        name: apache2
+        state: present
+
+    - name: Zorg ervoor dat mod_status is ingeschakeld
+      ansible.builtin.command: a2enmod status
+      notify: Restart Apache
+
+    - name: Configureer Apache-status pagina
+      ansible.builtin.copy:
+        dest: /etc/apache2/conf-available/status.conf
+        content: |
+          <IfModule mod_status.c>
+              <Location "/server-status">
+                  SetHandler server-status
+                  Require host localhost
+                  Require ip 172.16.2.30
+              </Location>
+          </IfModule>
+      notify: Restart Apache
+
+    - name: Schakel de Apache-status configuratie in
+      ansible.builtin.command: a2enconf status
+      notify: Restart Apache
+
+    - name: Zorg dat Apache draait
+      ansible.builtin.service:
+        name: apache2
+        state: started
+        enabled: yes
+
+    - name: Voeg apache_status plugin toe
+      ansible.builtin.copy:
+        dest: /usr/lib/check_mk_agent/plugins/apache_status
+        content: |
+          #!/usr/bin/env python3
+
+          import requests
+          import sys
+
+          # Vervang met het IP-adres of de hostname van je Apache-server
+          APACHE_STATUS_URL = "http://127.0.0.1/server-status?auto"
+          TIMEOUT = 5
+
+          def main():
+              try:
+                  response = requests.get(APACHE_STATUS_URL, timeout=TIMEOUT)
+                  response.raise_for_status()  # Dit zal een fout genereren voor een statuscode >= 400
+
+                  # Parse de inhoud van de server-status pagina
+                  data = response.text.splitlines()
+                  metrics = {}
+
+                  for line in data:
+                      if ':' in line:
+                          key, value = line.split(':', 1)
+                          metrics[key.strip()] = value.strip()
+
+                  # Print de metrics in een formaat dat Checkmk begrijpt
+                  print(f'Total Accesses: {metrics.get("Total Accesses", 0)}')
+                  print(f'Total kBytes: {metrics.get("Total kBytes", 0)}')
+                  print(f'Uptime: {metrics.get("ServerUptimeSeconds", 0)}')
+                  print(f'ReqPerSec: {metrics.get("ReqPerSec", 0)}')
+                  print(f'BusyWorkers: {metrics.get("BusyWorkers", 0)}')
+                  print(f'IdleWorkers: {metrics.get("IdleWorkers", 0)}')
+
+              except requests.exceptions.HTTPError as http_err:
+                  print(f"HTTP error occurred: {http_err}", file=sys.stderr)
+                  sys.exit(1)
+              except requests.exceptions.RequestException as req_err:
+                  print(f"Request error occurred: {req_err}", file=sys.stderr)
+                  sys.exit(1)
+              except Exception as e:
+                  print(f"An unexpected error occurred: {e}", file=sys.stderr)
+                  sys.exit(1)
+
+          if __name__ == "__main__":
+              main()
+        mode: '0755'  # Hier genest onder copy
+
+    - name: Herstart Checkmk-agent
+      ansible.builtin.service:
+        name: check-mk-agent.socket
+        state: restarted
+
+  handlers:
+    - name: Restart Apache
+      ansible.builtin.service:
+        name: apache2
+        state: restarted

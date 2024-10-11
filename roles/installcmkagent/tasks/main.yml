@@ -1,0 +1,70 @@
+---
+  - name: Download the Checkmk Agent .deb file
+    get_url:
+      url: http://172.16.2.30/monitoring/check_mk/agents/check-mk-agent_2.3.0p15-1_all.deb
+      dest: /tmp/check-mk-agent_2.3.0p15-1_all.deb
+
+  - name: Install the Checkmk Agent
+    apt:
+      deb: /tmp/check-mk-agent_2.3.0p15-1_all.deb
+      state: present
+
+  - name: Ensure the Checkmk Agent service is running and enabled
+    systemd:
+      name: check-mk-agent-async
+      state: started
+      enabled: yes
+
+  - name: Allow TCP port 6556 in the firewall
+    ufw:
+      rule: allow
+      port: '6556'
+      proto: tcp
+
+  - name: Allow UDP port 161 in the firewall
+    ufw:
+      rule: allow
+      port: '161'
+      proto: udp
+
+  - name: Reload UFW to apply changes
+    ufw:
+      state: reloaded
+      
+  - name: Check if Checkmk Agent is already registered
+    stat:
+      path: /var/lib/cmk-agent/registered_connections.json
+    register: agent_registered
+    ignore_errors: yes
+    
+  #- name: Debug Check agent
+  #  debug:
+  #    var: agent_registered
+
+  - name: Attempt to register Checkmk Agent with certificate
+    command: >
+      sudo cmk-agent-ctl register 
+      --hostname {{ inventory_hostname }}
+      --server 172.16.2.30:8000 
+      --site monitoring 
+      --user agent_registration 
+      --password '{{ checkmk_password }}'
+      --trust-cert
+    when: not agent_registered.stat.exists
+    register: registration_result
+    ignore_errors: yes
+
+  - name: Display registration result
+    debug:
+      msg: >
+        {% if registration_result is defined %}
+          {% if registration_result.rc is defined and registration_result.rc == 0 %}
+            "Agent geintsalleerd"
+          {% elif registration_result.stderr is defined %}
+            "Error during registration: {{ registration_result.stderr }}"
+          {% else %}
+            "Agent geinstalleerd"
+          {% endif %}
+        {% else %}
+          "Fout opgetreden, Agent niet geinstalleerd"
+        {% endif %}

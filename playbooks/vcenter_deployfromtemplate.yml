@@ -1,0 +1,66 @@
+---
+- name: Deploy VM from template on vCenter and install Apache Webservice
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  vars_files:
+    - vault.yml
+
+  vars:
+    vm_name: "TEST-126"
+    vm_ip: "172.16.2.126"
+    output_file: "deployedvms.ini"
+
+  tasks:
+    - name: Deploy VM from template
+      vmware_guest:
+        hostname: "192.168.200.24"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: no
+        datacenter: "Netlab-DC"
+        cluster: "Netlab-Cluster-B"
+        resource_pool: "I530600"
+        folder: "_Courses/I3-DB01/I530600"
+        name: "{{ vm_name }}"
+        state: present
+        template: "Templ_Ubuntu-Linux_Server"
+        disk:
+          - datastore: "DataCluster-Students"
+            size_gb: 90
+            type: thin
+        networks:
+          - name: "2732_I530600_PVlanA"
+            ip: "{{ vm_ip }}"
+            netmask: "255.255.255.0"
+            gateway: "172.16.2.1"
+            type: static
+        customization:
+          hostname: "{{ vm_name }}"
+
+    - name: Power on the deployed VM
+      vmware_guest_powerstate:
+        hostname: "192.168.200.24"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: no
+        name: "{{ vm_name }}"
+        state: powered-on
+        datacenter: "Netlab-DC"
+
+    - name: Ensure output file exists
+      file:
+        path: "{{ output_file }}"
+        state: touch
+
+    - name: Add VM details to group section in output file
+      lineinfile:
+        path: "{{ output_file }}"
+        line: "{{ vm_name }} ansible_host={{ vm_ip }} ansible_user=student ansible_become_password=student"
+        create: yes
+        state: present
+      loop:
+        - "{{ vm_name }}"
+
+    - name: Install Apache Webservice
+      include_tasks: install_apache.yml

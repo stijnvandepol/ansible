@@ -1,0 +1,40 @@
+- name: Update apt package cache
+  apt:
+    update_cache: yes
+
+- name: Upgrade all packages to latest version
+  apt:
+    upgrade: dist
+    autoremove: yes
+
+- name: Clean up cached package files
+  apt:
+    autoclean: yes
+    autoremove: yes
+
+- name: Check for pending updates
+  command: apt list --upgradable
+  register: upgradable_packages
+  changed_when: false
+  tags:
+    - Display
+
+- name: Check if a reboot is needed for servers
+  stat:
+    path: /var/run/reboot-required
+  register: reboot_required_file
+  changed_when: false
+
+- name: Display upgradable packages
+  debug:
+    msg: "{{ upgradable_packages.stdout }}"
+  tags:
+    - Display
+
+- name: Reboot the server if needed with a timeout
+  reboot:
+    msg: "Reboot initiated by Ansible because a reboot is required after updates."
+    reboot_timeout: 120
+    pre_reboot_delay: 0
+    post_reboot_delay: 30
+  when: reboot_required_file.stat.exists
