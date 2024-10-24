@@ -6,27 +6,28 @@
   vars_files:
     - vault.yml
     - vars.yml
+    - vmname.yml
 
   tasks:
     - name: Deploy eerste VM (1)
       include_role:
         name: deployvm
       vars:
-        vm_name: "testvm10"                          # VM name
-        vm_ip: "172.16.2.110"                       # VM IP
-        vm_template: "Templ_Ubuntu-Linux_Server"    # VM Template
-        vm_network: "2732_I530600_PVlanA"           # VM Vlan
+        vm_name: "{{ vm_name_b }}"                          # VM name
+        vm_ip: "172.16.20.233"                       # VM IP
+        vm_template: "Templ_Windows10"    # VM Template
+        vm_network: "2733_I530600_PVlanB"           # VM Vlan
       tags: deployvm
 
-    - name: Deploy tweede VM (2)
-      include_role:
-        name: deployvm
-      vars:
-        vm_name: "testvm11"                          # VM name
-        vm_ip: "172.16.2.111"                       # VM IP
-        vm_template: "Templ_Ubuntu-Linux_Server"    # VM Template
-        vm_network: "2732_I530600_PVlanA"           # VM Vlan
-      tags: deployvm
+    # - name: Deploy tweede VM (2)
+    #   include_role:
+    #     name: deployvm
+    #   vars:
+    #     vm_name: "testvm11"                          # VM name
+    #     vm_ip: "172.16.2.111"                       # VM IP
+    #     vm_template: "Templ_Ubuntu-Linux_Server"    # VM Template
+    #     vm_network: "2732_I530600_PVlanA"           # VM Vlan
+    #   tags: deployvm
 
 
 # Fase 2: Configureer en installeer software op de nieuwe VM
@@ -43,12 +44,12 @@
         name: updateserver
       tags: updateservers
 
-    - name: Installeer Apache op de nieuwe VM
-      include_role:
-        name: installapache
-      tags: installapache2
+    # - name: Installeer Apache op de nieuwe VM
+    #   include_role:
+    #     name: installapache
+    #   tags: installapache2
 
-    - name: Installeer CheckMK
-      include_role:
-        name: installcmkagent
-      tags: installcmkagent
+    # - name: Installeer CheckMK
+    #   include_role:
+    #     name: installcmkagent
+    #   tags: installcmkagent

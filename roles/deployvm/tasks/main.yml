@@ -20,7 +20,7 @@
       - name: "{{ vm_network }}"
         ip: "{{ vm_ip }}"
         netmask: "255.255.255.0"
-        gateway: "172.16.2.1"
+        gateway: "172.16.20.1"
     wait_for_ip_address: yes
   delegate_to: localhost
 
@@ -33,14 +33,14 @@
     groups: deployed_vms
 
 
-- name: Wait for new VMs to be reachable via SSH
-  wait_for: 
-    host: "{{ vm_ip }}"
-    port: 22
-    delay: 10
-    timeout: 600
-    state: started
-  remote_user: student
+# - name: Wait for new VMs to be reachable via SSH
+#   wait_for: 
+#     host: "{{ vm_ip }}"
+#     port: 22
+#     delay: 10
+#     timeout: 600
+#     state: started
+#   remote_user: student
 
 - name: VM Deployed
   pause:

@@ -1,0 +1,74 @@
+# Fase 1: AD user aan
+- name: Create a new user on Windows
+  hosts: dc
+  gather_facts: no
+  vars_prompt:
+    - name: "first_name"
+      prompt: "Enter the first name of the user"
+      private: no
+    - name: "last_name"
+      prompt: "Enter the last name of the user"
+      private: no
+    - name: "department"
+      prompt: "Enter the department of the user (this will be the user group)"
+      private: no
+    - name: "salary_number"
+      prompt: "Enter the salary number of the user"
+      private: no
+
+  vars_files:
+    - vars.yml
+
+  tasks:
+    - name: Create a new user
+      win_shell: net user "{{ first_name | lower }}.{{ last_name | replace(' ', '') | lower }}" "{{ default_password }}" /add /logonpasswordchg:yes
+      register: user_creation
+
+    - name: Set User Principal Name (UPN)
+      win_shell: |
+        $username = "{{ first_name | lower }}.{{ last_name | replace(' ', '') | lower }}"
+        $upn = "$username@{{ domain }}"
+        Set-ADUser -Identity $username -UserPrincipalName $upn -ChangePasswordAtLogon $true
+      when: user_creation.rc == 0
+
+    - name: Add the user to the specified department group
+      win_shell: net localgroup "{{ department }}" "{{ first_name | lower }}.{{ last_name | replace(' ', '') | lower }}" /add
+      when: user_creation.rc == 0
+
+    - name: Set vm_name_b globally 
+      set_fact:
+        vm_name_b: "WRS-{{ first_name | lower }}.{{ last_name | replace(' ', '') | lower }}-{{ salary_number }}"
+
+    - name: Write vm_name_b to file
+      copy:
+        content: "vm_name_b: {{ vm_name_b }}"
+        dest: "vmname.yml"
+      delegate_to: localhost
+
+
+# Fase 2: Deploy 1 virtuele machine in netlab
+- name: Deploy virtual machine
+  hosts: localhost
+  become: true
+  gather_facts: no
+  vars_files:
+    - vault.yml
+    - vars.yml
+    - vmname.yml
+
+  tasks:
+    - name: Deploy eerste VM (1)
+      include_role:
+        name: deployvm
+      vars:
+        vm_name: "{{ vm_name_b }}"
+        vm_ip: "172.16.20.220"
+        vm_template: "Templ_Windows10"
+        vm_network: "2732_I530600_PVlanA"
+      tags: deployvm
+
+    - name: Remove vm_name entry
+      file:
+        path: "vmname.yml"
+        state: absent
+      delegate_to: localhost
