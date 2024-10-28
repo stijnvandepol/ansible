@@ -1,6 +1,5 @@
----
-- name: Deploy a virtual machine from template
-  vmware_guest:
+- name: Maak Virtuele machine aan
+  community.vmware.vmware_guest:
     hostname: "{{ vcenter_hostname }}"
     username: "{{ vcenter_username }}"
     password: "{{ vcenter_password }}"
@@ -9,7 +8,7 @@
     datastore: "{{ vcenter_datastore }}"
     folder: "{{ vm_folder }}"
     template: "{{ vm_template }}"
-    name: "{{ vm_name }}"
+    name: "{{ var_vm_name }}"
     resource_pool: "{{ recourse_pool }}"
     cluster: "{{ netlabcluster }}"
     state: powered-on
@@ -18,18 +17,35 @@
       num_cpus: 2
     networks:
       - name: "{{ vm_network }}"
-        ip: "{{ vm_ip }}"
-        netmask: "255.255.255.0"
-        gateway: "172.16.2.1"
-        dns_servers:
-          - "172.16.2.1"
-          - "1.1.1.1"
     wait_for_ip_address: yes
   delegate_to: localhost
 
-- name: Add new VM to inventory
+- name: Haal IP adres van machine op
+  community.vmware.vmware_guest_info:
+    hostname: "{{ vcenter_hostname }}"
+    username: "{{ vcenter_username }}"
+    password: "{{ vcenter_password }}"
+    validate_certs: no
+    datacenter: "{{ vcenter_datacenter }}"
+    name: "{{ var_vm_name }}"
+  delegate_to: localhost
+  register: vm_info
+
+- name: Haal IP adres op
+  set_fact:
+    vm_ip: "{{ vm_info.instance.ipv4 }}"
+  when: vm_info.instance.ipv4 is defined
+
+- name: Schijf IP adres naar bestand
+  lineinfile:
+    path: "vmname.yml"
+    line: "vm_ip: {{ vm_ip }}"
+  when: vm_ip is defined
+  delegate_to: localhost
+
+- name: Schijf machine gegevens naar inventory
   add_host:
-    name: "{{ vm_name }}"
+    name: "{{ var_vm_name }}"
     ansible_host: "{{ vm_ip }}"
     ansible_user: student
     ansible_password: student
@@ -38,7 +54,5 @@
     ansible_winrm_server_cert_validation: ignore
     ansible_port: 5985
     groups: deployed_vms
+  when: vm_ip is defined
 
-- name: Wait for VM to reboot
-  pause:
-    seconds: 120

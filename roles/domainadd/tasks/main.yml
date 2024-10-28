@@ -1,5 +1,5 @@
 ---
-- name: Join the VM to the domain
+- name: Virtuele machine toevoegen aan domein
   win_domain_membership:
     dns_domain_name: "{{ domain }}"
     hostname: "{{ vm_name }}"
@@ -8,11 +8,11 @@
     state: domain
   register: domain_join_result
 
-- name: Check if reboot is required
+- name: Check of virtuele machine opnieuw moet worden gestart
   win_reboot:
     reboot_timeout: 600
   when: domain_join_result.reboot_required | default(false)
 
-- name: VM is added to the domain
+- name: Virtuele machine is aan het domein toegevoegd
   debug:
     msg: "The VM is added to the domain"

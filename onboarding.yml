@@ -1,83 +1,63 @@
-# Fase 1: AD user aanmaken
-- name: Create a new user on Windows
+---
+# Fase 1: Maak AD user 
+- name: Maak Active Directory gebruiker (1)
   hosts: dc
   gather_facts: no
   vars_prompt:
     - name: "first_name"
-      prompt: "Enter the first name of the user"
+      prompt: "Voer de voornaam van de nieuwe gebruiker in"
       private: no
     - name: "last_name"
-      prompt: "Enter the last name of the user"
+      prompt: "Voer de achternaam van de nieuwe gebruiker in"
       private: no
     - name: "department"
-      prompt: "Enter the department of the user (this will be the user group)"
+      prompt: "Voer de afdeling van de nieuwe gebruiker in"
       private: no
     - name: "salary_number"
-      prompt: "Enter the salary number of the user"
+      prompt: "Voer het salarisnummer van de nieuwe gebruiker in"
       private: no
 
   vars_files:
+    - vault.yml
     - vars.yml
 
-  tasks:
-    - name: Create a new user
-      win_shell: net user "{{ first_name | lower }}.{{ last_name | replace(' ', '') | lower }}" "{{ default_password }}" /add /logonpasswordchg:yes
-      register: user_creation
-
-    - name: Set User Principal Name (UPN)
-      win_shell: |
-        $username = "{{ first_name | lower }}.{{ last_name | replace(' ', '') | lower }}"
-        $upn = "$username@{{ domain }}"
-        Set-ADUser -Identity $username -UserPrincipalName $upn -ChangePasswordAtLogon $true
-      when: user_creation.rc == 0
-
-    - name: Add the user to the specified department group
-      win_shell: net localgroup "{{ department }}" "{{ first_name | lower }}.{{ last_name | replace(' ', '') | lower }}" /add
-      when: user_creation.rc == 0
-
-    - name: Set vm_name_b globally 
-      set_fact:
-        vm_name_b: "WRS-{{ first_name | lower }}{{ last_name | replace(' ', '') | lower }}-{{ salary_number }}"
-
-    - name: Write vm_name_b to file
-      copy:
-        content: "vm_name_b: {{ vm_name_b }}"
-        dest: "vmname.yml"
-      delegate_to: localhost
+  roles:
+    - createuser
 
 # Fase 2: Deploy 1 virtuele machine in netlab
-- name: Deploy virtual machine
+- name: Rol virtuele machine uit (2)
   hosts: localhost
   become: true
   gather_facts: no
+  collections:
+    - community.vmware
   vars_files:
     - vault.yml
     - vars.yml
     - vmname.yml
 
   tasks:
-    - name: Deploy vm
+    - name: Rol virtuele machine uit (2.1)
       include_role:
         name: deployvm
       vars:
-        vm_name: "{{ vm_name_b }}"
-        vm_ip: "172.16.2.227"
         vm_template: "Templ_Windows10a"
         vm_network: "2732_I530600_PVlanA"
       tags: deployvm
 
     # Wacht tot de vm is gestart
-    - name: Wait for the VM to be reachable on WinRM
+    - name: Wacht tot machine beschikbaar is (2.2)
       wait_for:
-        host: "172.16.2.227"
+        host: "{{ vm_ip }}"
         port: 5985
         delay: 60         
-        timeout: 600
+        timeout: 300
+        sleep: 10
         state: started
       delegate_to: localhost
 
 # Fase 3: Voeg de VM toe aan het domein
-- name: Add the VM to the domain
+- name: Voeg machine toe aan domein (3.1)
   hosts: deployed_vms
   gather_facts: no
   vars_files:
@@ -88,15 +68,16 @@
     - include_role:
         name: domainadd
       vars:
-        vm_name: "{{ vm_name_b }}"
+        vm_name: "{{ var_vm_name }}"
       tags: domainadd
 
 # Fase 4: Verwijder `vmname.yml`
-- name: Remove vmname file
+- name: Verwijder variabelen (4)
   hosts: localhost
   become: true
   tasks:
-    - name: Remove vm_name entry
-      file:
-        path: "vmname.yml"
-        state: absent
+    - name: Verwijder variabelen (4.1)
+      set_fact:
+        var_vm_name: ""
+        vm_ip: ""
+      delegate_to: localhost
