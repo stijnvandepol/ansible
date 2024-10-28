@@ -20,7 +20,10 @@
       - name: "{{ vm_network }}"
         ip: "{{ vm_ip }}"
         netmask: "255.255.255.0"
-        gateway: "172.16.20.1"
+        gateway: "172.16.2.1"
+        dns_servers:
+          - "172.16.2.1"
+          - "1.1.1.1"
     wait_for_ip_address: yes
   delegate_to: localhost
 
@@ -29,19 +32,13 @@
     name: "{{ vm_name }}"
     ansible_host: "{{ vm_ip }}"
     ansible_user: student
-    ansible_ssh_pass: student
+    ansible_password: student
+    ansible_connection: winrm
+    ansible_winrm_transport: ntlm
+    ansible_winrm_server_cert_validation: ignore
+    ansible_port: 5985
     groups: deployed_vms
 
-
-# - name: Wait for new VMs to be reachable via SSH
-#   wait_for: 
-#     host: "{{ vm_ip }}"
-#     port: 22
-#     delay: 10
-#     timeout: 600
-#     state: started
-#   remote_user: student
-
-- name: VM Deployed
+- name: Wait for VM to reboot
   pause:
-    seconds: 10
+    seconds: 120

@@ -1,4 +1,4 @@
-# Fase 1: AD user aan
+# Fase 1: AD user aanmaken
 - name: Create a new user on Windows
   hosts: dc
   gather_facts: no
@@ -37,14 +37,13 @@
 
     - name: Set vm_name_b globally 
       set_fact:
-        vm_name_b: "WRS-{{ first_name | lower }}.{{ last_name | replace(' ', '') | lower }}-{{ salary_number }}"
+        vm_name_b: "WRS-{{ first_name | lower }}{{ last_name | replace(' ', '') | lower }}-{{ salary_number }}"
 
     - name: Write vm_name_b to file
       copy:
         content: "vm_name_b: {{ vm_name_b }}"
         dest: "vmname.yml"
       delegate_to: localhost
-
 
 # Fase 2: Deploy 1 virtuele machine in netlab
 - name: Deploy virtual machine
@@ -57,18 +56,47 @@
     - vmname.yml
 
   tasks:
-    - name: Deploy eerste VM (1)
+    - name: Deploy vm
       include_role:
         name: deployvm
       vars:
         vm_name: "{{ vm_name_b }}"
-        vm_ip: "172.16.20.220"
-        vm_template: "Templ_Windows10"
+        vm_ip: "172.16.2.227"
+        vm_template: "Templ_Windows10a"
         vm_network: "2732_I530600_PVlanA"
       tags: deployvm
 
+    # Wacht tot de vm is gestart
+    - name: Wait for the VM to be reachable on WinRM
+      wait_for:
+        host: "172.16.2.227"
+        port: 5985
+        delay: 60         
+        timeout: 600
+        state: started
+      delegate_to: localhost
+
+# Fase 3: Voeg de VM toe aan het domein
+- name: Add the VM to the domain
+  hosts: deployed_vms
+  gather_facts: no
+  vars_files:
+    - vault.yml
+    - vars.yml
+    - vmname.yml
+  tasks:
+    - include_role:
+        name: domainadd
+      vars:
+        vm_name: "{{ vm_name_b }}"
+      tags: domainadd
+
+# Fase 4: Verwijder `vmname.yml`
+- name: Remove vmname file
+  hosts: localhost
+  become: true
+  tasks:
     - name: Remove vm_name entry
       file:
         path: "vmname.yml"
         state: absent
-      delegate_to: localhost

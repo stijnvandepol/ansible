@@ -1,0 +1,18 @@
+---
+- name: Join the VM to the domain
+  win_domain_membership:
+    dns_domain_name: "{{ domain }}"
+    hostname: "{{ vm_name }}"
+    domain_admin_user: "{{ domain_admin_user }}"
+    domain_admin_password: "{{ domain_admin_password }}"
+    state: domain
+  register: domain_join_result
+
+- name: Check if reboot is required
+  win_reboot:
+    reboot_timeout: 600
+  when: domain_join_result.reboot_required | default(false)
+
+- name: VM is added to the domain
+  debug:
+    msg: "The VM is added to the domain"
